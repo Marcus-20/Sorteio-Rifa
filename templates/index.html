@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sorteio do Liquidificador 🎁</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f4f9; margin: 0; padding: 20px; text-align: center; }
+        h1 { color: #333; margin-bottom: 5px; }
+        .preco { color: #28a745; font-size: 1.3em; font-weight: bold; margin-top: 0; }
+        .grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 8px; max-width: 650px; margin: 20px auto; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        @media (max-width: 600px) { .grid { grid-template-columns: repeat(5, 1fr); } }
+        .numero { padding: 15px 0; font-weight: bold; background-color: #2eb82e; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; transition: 0.2s; }
+        .numero:hover { filter: brightness(0.9); }
+        .numero.selecionado { background-color: #007bff; transform: scale(1.05); box-shadow: 0 2px 5px rgba(0,123,255,0.4); }
+        .numero.reservado { background-color: #ffc107; color: black; cursor: not-allowed; opacity: 0.75; }
+        .numero.pago { background-color: #dc3545; cursor: not-allowed; }
+        .form-container { max-width: 450px; margin: 20px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: left; }
+        .form-container h3 { margin-top: 0; text-align: center; color: #333; }
+        label { font-weight: bold; font-size: 14px; color: #555; }
+        input.text-input { width: 95%; padding: 10px; margin: 5px 0 15px 0; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        button.btn-enviar { width: 100%; padding: 14px; background-color: #007bff; color: white; border: none; font-size: 16px; font-weight: bold; border-radius: 4px; cursor: pointer; transition: 0.2s; }
+        button.btn-enviar:hover { background-color: #0056b3; }
+        #modal-pix { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 25px rgba(0,0,0,0.3); z-index: 1000; max-width: 90%; width: 350px; }
+        #overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 999; }
+        .pix-input { width: 100%; padding: 8px; text-align: center; background: #eee; border: 1px solid #ccc; font-family: monospace; font-size: 12px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <h1>Grande Sorteio do Liquidificador 🥤</h1>
+    <p class="preco">Apenas R$ 5,00 por número</p>
+    <p>Escolhe os teus números da sorte e paga de forma imediata via PIX:</p>
+
+    <div class="grid" id="grid-numeros"></div>
+
+    <div class="form-container">
+        <h3>Preenche os teus dados</h3>
+        <label>Teu Nome:</label>
+        <input type="text" id="nome" class="text-input" placeholder="Ex: Marcus Vinícius" required>
+        
+        <label>Teu WhatsApp/Telefone:</label>
+        <input type="tel" id="telefone" class="text-input" placeholder="Ex: 83999998888" required>
+        
+        <p>Números selecionados: <span id="qtd-selecionada" style="font-weight: bold; color: #007bff;">0</span></p>
+        <p>Valor Total: <span style="font-size: 18px; font-weight: bold; color: #28a745;">R$ <span id="total-preco">0,00</span></span></p>
+        
+        <button class="btn-enviar" onclick="enviarReserva()">Confirmar e Gerar PIX ⚡</button>
+    </div>
+
+    <div id="overlay"></div>
+    <div id="modal-pix">
+        <h3 style="margin-top:0;">Quase lá! Realiza o pagamento 🎉</h3>
+        <p style="font-size: 14px; color: #555;">Abre o teu app do **Nubank** (ou outro banco), escolhe a opção PIX e escaneia o código:</p>
+        
+        <img id="pix-img" src="" alt="QR Code PIX" style="max-width: 180px; margin: 10px 0; border: 1px solid #ddd; padding: 5px;"><br>
+        
+        <label style="font-size: 12px;">Código Copia e Cola:</label>
+        <input type="text" id="pix-copia-cola" class="pix-input" readonly onclick="this.select(); alert('Código copiado!'); document.execCommand('copy');">
+        
+        <p style="font-size: 11px; color: #dc3545; font-weight: bold; margin-top: 15px;">⚠️ NOTA: Os teus números só vão a sorteio quando o pagamento for concluído!</p>
+        <button onclick="fecharModal()" style="margin-top: 10px; padding: 6px 15px; border-radius:4px; border:1px solid #ccc; cursor:pointer;">Fechar Janela</button>
+    </div>
+
+    <script>
+        let numerosSelecionados = [];
+
+        async function carregarNumeros() {
+            const res = await fetch('/api/numeros');
+            const dados = await res.json();
+            const grid = document.getElementById('grid-numeros');
+            grid.innerHTML = '';
+
+            dados.forEach(item => {
+                const btn = document.createElement('button');
+                btn.className = 'numero';
+                btn.innerText = String(item.numero).padStart(2, '0');
+                
+                if (item.status === 'Pago') {
+                    btn.classList.add('pago');
+                    btn.disabled = true;
+                } else if (item.status === 'Reservado') {
+                    btn.classList.add('reservado');
+                    btn.disabled = true;
+                }
+
+                btn.onclick = () => alternarSelecao(item.numero, btn);
+                grid.appendChild(btn);
+            });
+        }
+
+        function alternarSelecao(numero, btn) {
+            if (numerosSelecionados.includes(numero)) {
+                numerosSelecionados = numerosSelecionados.filter(n => n !== numero);
+                btn.classList.remove('selecionado');
+            } else {
+                numerosSelecionados.push(numero);
+                btn.classList.add('selecionado');
+            }
+            
+            document.getElementById('qtd-selecionada').innerText = numerosSelecionados.length;
+            document.getElementById('total-preco').innerText = (numerosSelecionados.length * 5).toFixed(2).replace('.', ',');
+        }
+
+        async function enviarReserva() {
+            const nome = document.getElementById('nome').value;
+            const telefone = document.getElementById('telefone').value;
+
+            if (!nome || !telefone) {
+                alert('Por favor, digita o teu Nome e Telefone.');
+                return;
+            }
+            if (numerosSelecionados.length === 0) {
+                alert('Escolhe pelo menos um número da grade.');
+                return;
+            }
+
+            const resposta = await fetch('/api/reservar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nome, telefone, numeros: numerosSelecionados })
+            });
+
+            const resultado = await resposta.json();
+
+            if (resultado.erro) {
+                alert(resultado.erro);
+            } else {
+                document.getElementById('pix-img').src = `data:image/jpeg;base64,${resultado.pix_image}`;
+                document.getElementById('pix-copia-cola').value = resultado.pix_copia_cola;
+                document.getElementById('overlay').style.display = 'block';
+                document.getElementById('modal-pix').style.display = 'block';
+                numerosSelecionados = [];
+                carregarNumeros();
+            }
+        }
+
+        function fecharModal() {
+            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('modal-pix').style.display = 'none';
+        }
+
+        // Executa ao abrir o site
+        carregarNumeros();
+    </script>
+</body>
+</html>

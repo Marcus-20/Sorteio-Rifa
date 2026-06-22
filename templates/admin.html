@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Administração - Rifa 🎁</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f4f9; margin: 0; padding: 20px; }
+        h1 { text-align: center; color: #333; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .btn-reset { background-color: #dc3545; color: white; border: none; padding: 10px 20px; font-weight: bold; border-radius: 4px; cursor: pointer; float: right; margin-bottom: 20px; margin-left: 10px; }
+        .btn-reset:hover { background-color: #bd2130; }
+        .btn-sortear { background-color: #28a745; color: white; border: none; padding: 10px 20px; font-weight: bold; border-radius: 4px; cursor: pointer; float: right; margin-bottom: 20px; }
+        .btn-sortear:hover { background-color: #218838; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; clear: both; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #007bff; color: white; }
+        tr:hover { background-color: #f1f1f1; }
+        .status { padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 12px; }
+        .status.disponivel { background-color: #d4edda; color: #155724; }
+        .status.reservado { background-color: #fff3cd; color: #856404; }
+        .status.pago { background-color: #f8d7da; color: #721c24; }
+        .resultado-box { background-color: #d1ecf1; border: 2px dashed #0c5460; color: #0c5460; padding: 15px; border-radius: 6px; text-align: center; margin-bottom: 20px; display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <button class="btn-reset" onclick="reiniciarRifa()">🔄 Zerar Tudo</button>
+        <button class="btn-sortear" onclick="realizarSorteio()">🏆 Realizar Sorteio</button>
+        
+        <h1>📋 Painel de Controle da Rifa</h1>
+        <p style="text-align: center; color: #666;">Gerencie os 100 números, nomes e pagamentos abaixo.</p>
+
+        <div id="resultado-ganhador" class="resultado-box"></div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Número</th>
+                    <th>Comprador</th>
+                    <th>Telefone/WhatsApp</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="tabela-admin">
+                </tbody>
+        </table>
+    </div>
+
+    <script>
+        async function carregarDadosAdmin() {
+            const res = await fetch('/api/numeros');
+            const dados = await res.json();
+            const tabela = document.getElementById('tabela-admin');
+            tabela.innerHTML = '';
+
+            dados.forEach(item => {
+                const tr = document.createElement('tr');
+                
+                let statusClass = 'disponivel';
+                if (item.status === 'Reservado') statusClass = 'reservado';
+                if (item.status === 'Pago') statusClass = 'pago';
+
+                tr.innerHTML = `
+                    <td><strong>${String(item.numero).padStart(2, '0')}</strong></td>
+                    <td>${item.nome_comprador || '-'}</td>
+                    <td>${item.telefone || '-'}</td>
+                    <td><span class="status ${statusClass}">${item.status}</span></td>
+                `;
+                tabela.appendChild(tr);
+            });
+        }
+
+        async function realizarSorteio() {
+            if (confirm("Deseja realizar o sorteio agora entre todos os números pagos?")) {
+                const res = await fetch('/api/admin/sortear', { method: 'POST' });
+                const resultado = await res.json();
+                
+                const box = document.getElementById('resultado-ganhador');
+                if (resultado.sucesso) {
+                    box.style.display = 'block';
+                    box.innerHTML = `<h2>🎉 GANHADOR ENCONTRADO! 🎉</h2>
+                                     <p><strong>Número:</strong> ${resultado.numero}</p>
+                                     <p><strong>Nome:</strong> ${resultado.nome}</p>
+                                     <p><strong>WhatsApp:</strong> ${resultado.telefone}</p>`;
+                    alert(`O Número sorteado foi o ${resultado.numero} - Ganhador: ${resultado.nome}`);
+                } else {
+                    alert(resultado.erro || "Erro ao realizar o sorteio.");
+                }
+            }
+        }
+
+        async function reiniciarRifa() {
+            if (confirm("Tem certeza de que quer ZERAR todos os números?")) {
+                const res = await fetch('/api/admin/reset', { method: 'POST' });
+                const resultado = await res.json();
+                if (resultado.sucesso) {
+                    alert("Rifa reiniciada!");
+                    document.getElementById('resultado-ganhador').style.display = 'none';
+                    carregarDadosAdmin();
+                }
+            }
+        }
+
+        // Carrega ao abrir a página
+        carregarDadosAdmin();
+    </script>
+</body>
+</html>
