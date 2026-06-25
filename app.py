@@ -33,7 +33,6 @@ def inicializar_banco():
         conexao = conectar_banco()
         cursor = conexao.cursor()
         
-        # Cria a tabela caso ela não exista no PostgreSQL/MySQL
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sorteio_liquidificador (
                 numero INT PRIMARY KEY,
@@ -44,11 +43,9 @@ def inicializar_banco():
         """)
         conexao.commit()
 
-        # Verifica se a tabela já está populada
         cursor.execute("SELECT COUNT(*) FROM sorteio_liquidificador")
         total = cursor.fetchone()[0]
 
-        # Se estiver vazia, insere os números de 1 a 100
         if total == 0:
             for i in range(1, 101):
                 cursor.execute(
@@ -63,7 +60,7 @@ def inicializar_banco():
     except Exception as e:
         print(f"⚠️ Erro ao inicializar banco de dados: {str(e)}")
 
-# Chamar a função para preparar o banco antes do app rodar de verdade
+# Inicializa o banco antes do app rodar
 inicializar_banco()
 
 # Rota principal para carregar a página HTML
@@ -106,7 +103,6 @@ def reservar_numeros():
         cursor = conexao.cursor()
         
         format_strings = ','.join(['%s'] * len(numeros_escolhidos))
-        # Ajuste para garantir comparação correta ignorando maiúsculas/minúsculas
         cursor.execute(f"SELECT numero FROM sorteio_liquidificador WHERE numero IN ({format_strings}) AND LOWER(status) != 'disponível'", tuple(numeros_escolhidos))
         ocupados = cursor.fetchall()
         
@@ -214,11 +210,32 @@ def webhook_mercado_pago():
                 
                 cursor.close()
                 conexao.close()
-                print(f"🎉 SUCESSO: Pagamento {id_recurso} aprovado! Números confirmados: {numeros_pagos}")
+                print(f"🎉 SUCESSO: Pagamento {id_recurso} approved! Números confirmados: {numeros_pagos}")
         except Exception as e:
             print(f"⚠️ Erro ao processar o webhook para o pagamento {id_recurso}: {str(e)}")
 
     return jsonify({"status": "recebido"}), 200
+
+# === ROTA SECRETA: TRANSFORMA TODOS OS AMARELOS EM VERMELHOS DE UMA VEZ ===
+@app.route('/forcar-todos-pagos')
+def forcar_todos_pagos():
+    try:
+        conexao = conectar_banco()
+        cursor = conexao.cursor()
+        
+        # Altera todos os registros que estão 'Reservado' para 'Pago'
+        cursor.execute(
+            "UPDATE sorteio_liquidificador SET status = 'Pago' WHERE status = 'Reservado'"
+        )
+        
+        linhas_alteradas = cursor.rowcount  # Quantos números mudaram
+        conexao.commit()
+        cursor.close()
+        conexao.close()
+        
+        return f"<h1>Sucesso! {linhas_alteradas} números mudaram de amarelo para VERMELHO!</h1>"
+    except Exception as e:
+        return f"<h1>Erro ao atualizar todos: {str(e)}</h1>"
 
 # === ROTAS DE ADMINISTRAÇÃO ===
 @app.route('/admin')

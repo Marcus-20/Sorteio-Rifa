@@ -1,0 +1,23 @@
+{
+    "sqltools.connections": [
+        {
+            "pgOptions": {
+                "ssl": {
+                    "rejectUnauthorized": true
+                }
+            },
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "localhostdpg-d8slcbvavr4c73fun1u0-a.oregon-postgres.render.com",
+            "port": 5432,
+            "sshOptions": {
+                "port": 22
+            },
+            "driver": "PostgreSQL",
+            "name": "Banco Rifa Nuvem ",
+            "database": "sistema_rifa_alx6",
+            "username": "root",
+            "password": "2ML7wQkFSuyGk9iHafcyaQ2MBCu4ZLQX"
+        }
+    ]
+}
