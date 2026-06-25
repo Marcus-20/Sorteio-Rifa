@@ -182,7 +182,6 @@ def reservar_numeros():
 # 3. WEBHOOK AUTOMÁTICO (CORRIGIDO PARA VALIDAÇÃO)
 @app.route('/webhook-pagamento', methods=['POST', 'GET'])
 def webhook_mercado_pago():
-    # Se o Mercado Pago enviar um teste (GET) para validar a URL, responde 200 na hora
     if request.method == 'GET':
         return jsonify({"status": "sucesso", "mensagem": "Webhook validado com sucesso"}), 200
 
@@ -226,16 +225,11 @@ def forcar_todos_pagos():
     try:
         conexao = conectar_banco()
         cursor = conexao.cursor()
-        
-        cursor.execute(
-            "UPDATE sorteio_liquidificador SET status = 'Pago' WHERE status = 'Reservado'"
-        )
-        
+        cursor.execute("UPDATE sorteio_liquidificador SET status = 'Pago' WHERE status = 'Reservado'")
         linhas_alteradas = cursor.rowcount  
         conexao.commit()
         cursor.close()
         conexao.close()
-        
         return f"<h1>Sucesso! {linhas_alteradas} números mudaram de amarelo para VERMELHO!</h1>"
     except Exception as e:
         return f"<h1>Erro ao atualizar todos: {str(e)}</h1>"
@@ -245,11 +239,44 @@ def forcar_todos_pagos():
 def admin_painel():
     return render_template('admin.html')
 
+# NOVA API: Rota para o Admin editar manualmente os dados de um número específico
+@app.route('/api/admin/editar-numero', methods=['POST'])
+def editar_numero_manual():
+    dados = request.json
+    numero = dados.get('numero')
+    novo_status = dados.get('status')
+    novo_nome = dados.get('nome_comprador')
+    novo_telefone = dados.get('telefone')
+
+    if not numero:
+        return jsonify({"erro": "Número inválido"}), 400
+
+    # Se o status mudar para 'Disponível' (Livre), limpa o nome e telefone automaticamente
+    if novo_status == 'Disponível':
+        novo_nome = None
+        novo_telefone = None
+
+    try:
+        conexao = conectar_banco()
+        cursor = conexao.cursor()
+        
+        cursor.execute("""
+            UPDATE sorteio_liquidificador 
+            SET status = %s, nome_comprador = %s, telefone = %s 
+            WHERE numero = %s
+        """, (novo_status, novo_nome, novo_telefone, numero))
+        
+        conexao.commit()
+        cursor.close()
+        conexao.close()
+        return jsonify({"sucesso": True, "mensagem": f"Número {numero} atualizado com sucesso!"})
+    except Exception as e:
+        return jsonify({"erro": f"Erro ao atualizar o banco: {str(e)}"}), 500
+
 @app.route('/api/admin/sortear', methods=['POST'])
 def realizar_sorteio():
     try:
         conexao = conectar_banco()
-        
         if hasattr(conexao, 'cursor_factory'):
             cursor = conexao.cursor(cursor_factory=RealDictCursor)
         else:
@@ -257,7 +284,6 @@ def realizar_sorteio():
         
         cursor.execute("SELECT numero, nome_comprador, telefone FROM sorteio_liquidificador WHERE status = 'Pago'")
         numeros_pagos = cursor.fetchall()
-        
         cursor.close()
         conexao.close()
 
@@ -265,7 +291,6 @@ def realizar_sorteio():
             return jsonify({"erro": "Nenhum número foi pago ainda. O sorteio não pode ser realizado!"}), 400
 
         ganhador = random.choice(numeros_pagos)
-        
         return jsonify({
             "sucesso": True,
             "numero": str(ganhador['numero']).zfill(2),
