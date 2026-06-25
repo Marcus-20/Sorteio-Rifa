@@ -179,9 +179,13 @@ def reservar_numeros():
     except Exception as e:
         return jsonify({"erro": f"Erro interno no servidor: {str(e)}"}), 500
 
-# 3. WEBHOOK AUTOMÁTICO
-@app.route('/webhook-pagamento', methods=['POST'])
+# 3. WEBHOOK AUTOMÁTICO (CORRIGIDO PARA VALIDAÇÃO)
+@app.route('/webhook-pagamento', methods=['POST', 'GET'])
 def webhook_mercado_pago():
+    # Se o Mercado Pago enviar um teste (GET) para validar a URL, responde 200 na hora
+    if request.method == 'GET':
+        return jsonify({"status": "sucesso", "mensagem": "Webhook validado com sucesso"}), 200
+
     id_recurso = request.args.get('data.id')
     tipo_recurso = request.args.get('type')
 
@@ -216,19 +220,18 @@ def webhook_mercado_pago():
 
     return jsonify({"status": "recebido"}), 200
 
-# === ROTA SECRETA: TRANSFORMA TODOS OS AMARELOS EM VERMELHOS DE UMA VEZ ===
+# === ROTA SECRETA ===
 @app.route('/forcar-todos-pagos')
 def forcar_todos_pagos():
     try:
         conexao = conectar_banco()
         cursor = conexao.cursor()
         
-        # Altera todos os registros que estão 'Reservado' para 'Pago'
         cursor.execute(
             "UPDATE sorteio_liquidificador SET status = 'Pago' WHERE status = 'Reservado'"
         )
         
-        linhas_alteradas = cursor.rowcount  # Quantos números mudaram
+        linhas_alteradas = cursor.rowcount  
         conexao.commit()
         cursor.close()
         conexao.close()
